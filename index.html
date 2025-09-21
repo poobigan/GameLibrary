@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activity Time Tracker - Track Your Life</title>
+    
+    <!-- CSS File -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Google Fonts for better typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏱️</text></svg>">
+</head>
+<body>
+    <!-- Main App Container -->
+    <div id="app">
+        <!-- Header Section -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1>⏱️ Activity Tracker</h1>
+                <div class="header-actions">
+                    <!-- Sync Status Indicator -->
+                    <div id="sync-status" class="sync-status">
+                        <span class="sync-dot"></span>
+                        <span class="sync-text">Offline</span>
+                    </div>
+                    
+                    <!-- Google Sheets Connection Button -->
+                    <button id="connect-sheets" class="btn-secondary">
+                        Connect Google Sheets
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Timer Section - The main control panel -->
+        <section class="timer-section">
+            <div class="timer-card">
+                <!-- Activity Selector -->
+                <div class="activity-selector-container">
+                    <label for="activity-selector">Current Activity:</label>
+                    <select id="activity-selector" class="activity-selector">
+                        <option value="">Select an activity...</option>
+                        <!-- Activities will be added here by JavaScript -->
+                    </select>
+                </div>
+
+                <!-- Timer Display -->
+                <div class="timer-display-container">
+                    <div id="timer-display" class="timer-display">00:00:00</div>
+                    <div id="current-activity-name" class="current-activity-name"></div>
+                </div>
+
+                <!-- Timer Control Button -->
+                <button id="timer-button" class="timer-button" disabled>
+                    START
+                </button>
+
+                <!-- Add New Activity Section -->
+                <div class="add-activity-section">
+                    <button id="show-add-activity" class="btn-link">+ Add New Activity</button>
+                    <div id="add-activity-form" class="add-activity-form hidden">
+                        <input 
+                            type="text" 
+                            id="new-activity-name" 
+                            placeholder="Activity name (e.g., Reading, Exercise)"
+                            maxlength="50"
+                        >
+                        <div class="color-picker">
+                            <label>Pick a color:</label>
+                            <div class="color-options">
+                                <button class="color-option" data-color="#FF6B6B" style="background: #FF6B6B"></button>
+                                <button class="color-option" data-color="#4ECDC4" style="background: #4ECDC4"></button>
+                                <button class="color-option" data-color="#45B7D1" style="background: #45B7D1"></button>
+                                <button class="color-option" data-color="#96CEB4" style="background: #96CEB4"></button>
+                                <button class="color-option" data-color="#FFEAA7" style="background: #FFEAA7"></button>
+                                <button class="color-option" data-color="#DDA0DD" style="background: #DDA0DD"></button>
+                                <button class="color-option" data-color="#98D8C8" style="background: #98D8C8"></button>
+                                <button class="color-option" data-color="#FFB6C1" style="background: #FFB6C1"></button>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button id="save-activity" class="btn-primary">Save Activity</button>
+                            <button id="cancel-add" class="btn-secondary">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Statistics Section -->
+        <section class="stats-section">
+            <h2>Today's Stats</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="today-total">0h 0m</div>
+                    <div class="stat-label">Total Today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="week-total">0h 0m</div>
+                    <div class="stat-label">This Week</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="session-count">0</div>
+                    <div class="stat-label">Sessions Today</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Activities Grid - Steam library style display -->
+        <section class="activities-section">
+            <h2>Your Activities</h2>
+            <div id="activities-grid" class="activities-grid">
+                <!-- Activity cards will be added here by JavaScript -->
+                <!-- Example structure:
+                <div class="activity-card">
+                    <div class="activity-color-bar"></div>
+                    <div class="activity-content">
+                        <h3>Machine Learning</h3>
+                        <div class="activity-time">24.5 hours</div>
+                        <div class="activity-sessions">15 sessions</div>
+                        <div class="activity-last">Last: 2 hours ago</div>
+                    </div>
+                </div>
+                -->
+            </div>
+        </section>
+
+        <!-- Recent Sessions -->
+        <section class="sessions-section">
+            <h2>Recent Sessions</h2>
+            <div id="recent-sessions" class="recent-sessions">
+                <!-- Sessions will be listed here -->
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Your data is stored locally and in your personal Google Sheet</p>
+            <button id="export-data" class="btn-link">Export Local Data</button>
+            <button id="clear-data" class="btn-link danger">Clear All Data</button>
+        </footer>
+    </div>
+
+    <!-- Modal for confirmations -->
+    <div id="modal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="modal-title">Confirm</h3>
+            <p id="modal-message">Are you sure?</p>
+            <div class="modal-actions">
+                <button id="modal-confirm" class="btn-primary">Confirm</button>
+                <button id="modal-cancel" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google API Script -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    
+    <!-- Main Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>

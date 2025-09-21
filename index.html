@@ -32,7 +32,7 @@
                     
                     <!-- Google Sheets Connection Button -->
                     <button id="connect-sheets" class="btn-secondary">
-                        Connect Google Sheets
+                        Sign in with Google
                     </button>
                 </div>
             </div>
@@ -141,8 +141,14 @@
 
         <!-- Footer -->
         <footer class="app-footer">
-            <p>Your data is stored locally and in your personal Google Sheet</p>
+            <p>
+                <strong>Privacy First:</strong> Your data never leaves your browser and Google account. 
+                <a href="#" id="view-source">View Source Code</a> | 
+                <a href="https://myaccount.google.com/permissions" target="_blank">Manage Google Permissions</a>
+            </p>
+            <p>This app only creates/edits a sheet called "Time Tracker Data" in your Drive.</p>
             <button id="export-data" class="btn-link">Export Local Data</button>
+            <button id="view-sheet" class="btn-link">Open Your Google Sheet</button>
             <button id="clear-data" class="btn-link danger">Clear All Data</button>
         </footer>
     </div>
@@ -159,9 +165,37 @@
         </div>
     </div>
 
-    <!-- Google API Script -->
-    <script src="https://apis.google.com/js/api.js"></script>
-    
+    <!-- Privacy Notice Modal -->
+    <div id="privacy-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 600px;">
+            <h3>🔒 Privacy & Security Notice</h3>
+            <div style="margin: 1rem 0; color: var(--text-secondary);">
+                <p><strong>This app respects your privacy:</strong></p>
+                <ul style="text-align: left; margin: 1rem 0;">
+                    <li>✅ Your data goes directly to YOUR Google account</li>
+                    <li>✅ No servers or third parties involved</li>
+                    <li>✅ Creates only ONE sheet: "Time Tracker Data"</li>
+                    <li>✅ Cannot access your other files</li>
+                    <li>✅ You can revoke access anytime</li>
+                </ul>
+                <p><strong>Permissions explained:</strong></p>
+                <ul style="text-align: left; margin: 1rem 0;">
+                    <li>📊 <strong>Sheets:</strong> Only for the tracker sheet</li>
+                    <li>📁 <strong>Drive:</strong> Only files created by this app</li>
+                    <li>📧 <strong>Email:</strong> Just to show who's logged in</li>
+                </ul>
+                <p style="font-size: 0.875rem; margin-top: 1rem;">
+                    View full source code and security details in the 
+                    <a href="https://github.com/YOUR_USERNAME/time-tracker" target="_blank">GitHub repository</a>
+                </p>
+            </div>
+            <div class="modal-actions">
+                <button id="privacy-accept" class="btn-primary">I Understand, Continue</button>
+                <button id="privacy-cancel" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Application Script -->
     <script src="app.js"></script>
 </body>

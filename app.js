@@ -24,18 +24,17 @@ const appState = {
     selectedColor: '#4ECDC4',   // Default color for new activities
     googleConnected: false,     // Is Google Sheets connected?
     sheetId: null,             // User's Google Sheet ID
+    tokenClient: null,         // Google OAuth token client (new GIS)
+    accessToken: null,         // Current access token
+    userEmail: null,           // Signed in user's email
 };
 
-// Google API Configuration
-// IMPORTANT: You only need to set the Client ID. Users will authenticate with their own Google account.
+// Google API Configuration - Using new Google Identity Services (GIS)
 const GOOGLE_API_CONFIG = {
-    // Get this from Google Cloud Console (no API key needed with OAuth!)
+    // Your actual Client ID from Google Cloud Console
     clientId: '699463673260-1r4abo0rvqa2aflrsd3hk8r22bf9bs5h.apps.googleusercontent.com', 
     // RESTRICTED SCOPES: We only request the minimum permissions needed
-    // - spreadsheets: Only for sheets we create (cannot access other sheets)
-    // - drive.file: Only files created by this app (cannot see other Drive files)
-    // - email: Just to show who's logged in (read-only)
-    scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file email',
+    scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
     discoveryDocs: [
         'https://sheets.googleapis.com/$discovery/rest?version=v4',
         'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
@@ -51,7 +50,7 @@ const SECURITY_INFO = {
         email: 'Read-only, just to display your email'
     },
     dataFlow: 'Browser → Your Google Account (never through our servers)',
-    sourceCode: 'https://github.com/poobigan/time-tracker'  // Add your repo
+    sourceCode: 'https://github.com/YOUR_USERNAME/time-tracker'  // Add your repo
 };
 
 // ============================================
@@ -83,9 +82,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update the UI with loaded data
     updateUI();
     
-    // Load Google API if client ID is configured
-    if (GOOGLE_API_CONFIG.clientId !== 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com') {
-        loadGoogleAPI();
+    // Check if Google APIs are configured
+    if (GOOGLE_API_CONFIG.clientId && !GOOGLE_API_CONFIG.clientId.includes('YOUR_CLIENT_ID_HERE')) {
+        // Client ID is configured, load Google APIs
+        // Give the Google scripts time to load
+        setTimeout(loadGoogleAPI, 1000);
     } else {
         console.log('Google OAuth not configured. Get a Client ID from Google Cloud Console.');
         console.log('The app works perfectly fine locally without Google Sheets!');
@@ -627,38 +628,43 @@ function saveSessions() {
 }
 
 // ============================================
-// GOOGLE SHEETS INTEGRATION
+// GOOGLE SHEETS INTEGRATION (NEW GIS METHOD)
 // ============================================
 
 /**
- * Load Google API
+ * Load and initialize Google APIs
  */
 function loadGoogleAPI() {
-    console.log('Loading Google API...');
-    const script = document.createElement('script');
-    script.src = 'https://apis.google.com/js/api.js';
-    script.onload = () => {
-        gapi.load('client:auth2', initGoogleAPI);
-    };
-    document.body.appendChild(script);
+    console.log('Loading Google APIs...');
+    
+    // Wait for both libraries to be ready
+    if (typeof gapi === 'undefined' || typeof google === 'undefined') {
+        // Try again in 100ms if libraries aren't loaded yet
+        setTimeout(loadGoogleAPI, 100);
+        return;
+    }
+    
+    // Load the Google API client library
+    gapi.load('client', initGoogleAPI);
 }
 
 /**
- * Initialize Google API
+ * Initialize Google API client
  */
 async function initGoogleAPI() {
     try {
+        // Initialize the API client (for Sheets and Drive)
         await gapi.client.init({
-            clientId: GOOGLE_API_CONFIG.clientId,
-            scope: GOOGLE_API_CONFIG.scope,
             discoveryDocs: GOOGLE_API_CONFIG.discoveryDocs
         });
         
-        // Listen for sign-in state changes
-        gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+        console.log('Google API client initialized');
         
-        // Handle initial sign-in state
-        updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+        // Initialize the token client for authentication (new GIS approach)
+        initializeTokenClient();
+        
+        // Check if we have a stored token
+        checkStoredToken();
         
     } catch (error) {
         console.error('Error initializing Google API:', error);
@@ -667,30 +673,47 @@ async function initGoogleAPI() {
 }
 
 /**
- * Update UI based on sign-in status
+ * Initialize the Google Identity Services token client
  */
-function updateSigninStatus(isSignedIn) {
-    if (isSignedIn) {
-        handleGoogleSignIn();
-    } else {
-        appState.googleConnected = false;
-        updateSyncStatus('offline');
-        document.getElementById('connect-sheets').textContent = 'Sign in with Google';
-    }
+function initializeTokenClient() {
+    appState.tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_API_CONFIG.clientId,
+        scope: GOOGLE_API_CONFIG.scope,
+        callback: (response) => {
+            // Handle the token response
+            if (response.access_token) {
+                appState.accessToken = response.access_token;
+                gapi.client.setToken({ access_token: response.access_token });
+                handleGoogleSignIn();
+            }
+        },
+        error_callback: (error) => {
+            console.error('Token client error:', error);
+            updateSyncStatus('offline');
+        }
+    });
+    
+    console.log('Google Identity Services token client initialized');
 }
 
 /**
- * Handle Google Sheets connection
+ * Check if we have a stored token that might still be valid
+ */
+function checkStoredToken() {
+    // Note: For security, we don't store tokens in localStorage
+    // User needs to sign in each session (more secure)
+    // If you want persistent sessions, you'd need to implement refresh tokens
+    updateSyncStatus('offline');
+    document.getElementById('connect-sheets').textContent = 'Sign in with Google';
+}
+
+/**
+ * Handle Google Sheets connection (new method)
  */
 async function handleGoogleConnect() {
     if (appState.googleConnected) {
         // Sign out
-        gapi.auth2.getAuthInstance().signOut();
-        appState.googleConnected = false;
-        appState.sheetId = null;
-        localStorage.removeItem('sheetId');
-        updateSyncStatus('offline');
-        document.getElementById('connect-sheets').textContent = 'Sign in with Google';
+        handleGoogleSignOut();
     } else {
         // Show privacy notice for first-time users
         const hasSeenPrivacyNotice = localStorage.getItem('privacyNoticeAccepted');
@@ -700,16 +723,11 @@ async function handleGoogleConnect() {
             document.getElementById('privacy-modal').classList.remove('hidden');
             
             // Set up privacy modal buttons
-            document.getElementById('privacy-accept').onclick = async () => {
+            document.getElementById('privacy-accept').onclick = () => {
                 localStorage.setItem('privacyNoticeAccepted', 'true');
                 document.getElementById('privacy-modal').classList.add('hidden');
-                // Proceed with sign in
-                try {
-                    await gapi.auth2.getAuthInstance().signIn();
-                } catch (error) {
-                    console.error('Sign in failed:', error);
-                    alert('Sign in cancelled or failed. You can still use the app locally!');
-                }
+                // Proceed with sign in using new token client
+                requestGoogleAccess();
             };
             
             document.getElementById('privacy-cancel').onclick = () => {
@@ -717,14 +735,23 @@ async function handleGoogleConnect() {
             };
         } else {
             // User has seen notice before, proceed directly
-            try {
-                await gapi.auth2.getAuthInstance().signIn();
-            } catch (error) {
-                console.error('Sign in failed:', error);
-                alert('Sign in cancelled or failed. You can still use the app locally!');
-            }
+            requestGoogleAccess();
         }
     }
+}
+
+/**
+ * Request access token from Google (new GIS method)
+ */
+function requestGoogleAccess() {
+    if (!appState.tokenClient) {
+        console.error('Token client not initialized');
+        alert('Google Sign-In not properly initialized. Please refresh the page.');
+        return;
+    }
+    
+    // Request access token (this will show the consent screen)
+    appState.tokenClient.requestAccessToken({ prompt: 'consent' });
 }
 
 /**
@@ -735,11 +762,20 @@ async function handleGoogleSignIn() {
     appState.googleConnected = true;
     updateSyncStatus('syncing');
     
-    // Get user email for personalization
-    const profile = gapi.auth2.getAuthInstance().currentUser.get().getBasicProfile();
-    const userEmail = profile.getEmail();
-    console.log('Signed in as:', userEmail);
-    console.log('Permissions granted: Sheets (app files only), Drive.file (app files only), Email (read-only)');
+    // Get user info using the access token
+    try {
+        const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: {
+                'Authorization': `Bearer ${appState.accessToken}`
+            }
+        });
+        const userInfo = await response.json();
+        appState.userEmail = userInfo.email;
+        console.log('Signed in as:', appState.userEmail);
+        console.log('Permissions granted: Sheets (app files only), Drive.file (app files only), Email (read-only)');
+    } catch (error) {
+        console.error('Could not get user info:', error);
+    }
     
     document.getElementById('connect-sheets').textContent = 'Sign out';
     
@@ -755,6 +791,30 @@ async function handleGoogleSignIn() {
     console.log('=== SYNC COMPLETE ===');
     console.log('Your data is now backed up to Google Sheets');
     console.log('Sheet URL: https://docs.google.com/spreadsheets/d/' + appState.sheetId);
+}
+
+/**
+ * Handle Google sign out
+ */
+function handleGoogleSignOut() {
+    // Revoke the token
+    if (appState.accessToken) {
+        google.accounts.oauth2.revoke(appState.accessToken, () => {
+            console.log('Access token revoked');
+        });
+    }
+    
+    // Clear state
+    appState.googleConnected = false;
+    appState.accessToken = null;
+    appState.userEmail = null;
+    gapi.client.setToken(null);
+    
+    // Update UI
+    updateSyncStatus('offline');
+    document.getElementById('connect-sheets').textContent = 'Sign in with Google';
+    
+    console.log('Signed out successfully');
 }
 
 /**
@@ -781,6 +841,9 @@ async function setupUserSheet() {
     
     // Search for existing Time Tracker sheet in user's Drive
     try {
+        // Make sure Drive API is loaded
+        await gapi.client.load('drive', 'v3');
+        
         const searchResponse = await gapi.client.drive.files.list({
             q: "name='Time Tracker Data' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false",
             spaces: 'drive',
